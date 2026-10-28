@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="uk" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.T.A.L.K.E.R. Zone Survival: SCRP Lab Edition</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        stalker: {
+                            dark: '#0a0d0c',
+                            card: '#121916',
+                            border: '#1e3328',
+                            neon: '#00ff66',
+                            accent: '#ffb703',
+                            danger: '#ef4444'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+        
+        .font-mono-custom { font-family: 'Share Tech Mono', monospace; }
+        .font-pixel { font-family: 'VT323', monospace; }
+        
+        .glass-panel {
+            background: rgba(18, 25, 22, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 102, 0.2);
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.1);
+        }
+        
+        .glass-panel-danger {
+            background: rgba(25, 15, 15, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.15);
+        }
+
+        .neon-text {
+            text-shadow: 0 0 8px rgba(0, 255, 102, 0.6);
+        }
+
+        .neon-border {
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
+        }
+
+        /* Scanlines overlay */
+        .scanlines {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            ), linear-gradient(
+                90deg,
+                rgba(255, 0, 0, 0.03),
+                rgba(0, 255, 0, 0.01),
+                rgba(0, 0, 255, 0.03)
+            );
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.8; filter: drop-shadow(0 0 5px #00ff66); }
+            50% { opacity: 1; filter: drop-shadow(0 0 15px #00ff66); }
+        }
+        .animate-pulse-glow { animation: pulse-glow 2s infinite; }
+    </style>
+</head>
+<body class="bg-stalker-dark text-gray-200 font-mono-custom h-screen overflow-hidden select-none relative flex flex-col">
+
+    <!-- Background Layer with Stalker Zone Image -->
+    <div class="absolute inset-0 z-0 opacity-40 bg-cover bg-center pointer-events-none" style="background-image: url('https://i.postimg.cc/FKTcN4Zc/images.jpg');"></div>
+    <!-- CRT Scanlines Effect -->
+    <div class="absolute inset-0 z-10 scanlines"></div>
+
+    <!-- TOP BAR / HUD HEADER -->
+    <header class="relative z-20 flex justify-between items-center p-3 glass-panel border-b border-stalker-border text-xs md:text-sm">
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded border border-stalker-border">
+                <span class="w-2 h-2 rounded-full bg-stalker-neon animate-ping"></span>
+                <span class="text-stalker-neon font-bold">SCRP LAB ZONE</span>
+            </div>
+            <div class="hidden sm:flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded border border-stalker-border">
+                <span class="text-gray-400">TikTok:</span>
+                <span id="display-username" class="text-stalker-accent font-bold">@scrp_lab</span>
+            </div>
+        </div>
+
+        <!-- Central Wave & Geiger Info -->
+        <div class="flex items-center gap-4">
+            <div class="glass-panel px-3 py-1 rounded text-center">
+                <div class="text-[10px] text-gray-400 uppercase">Хвиля Зони</div>
+                <div id="hud-wave" class="text-stalker-neon font-bold text-base">01</div>
+            </div>
+            <div class="glass-panel px-3 py-1 rounded text-center">
+                <div class="text-[10px] text-gray-400 uppercase">Радіація</div>
+                <div id="hud-geiger" class="text-stalker-accent font-bold text-base">0.34 мЗв</div>
+            </div>
+            <div class="glass-panel px-3 py-1 rounded text-center">
+                <div class="text-[10px] text-gray-400 uppercase">Енергія</div>
+                <div id="hud-energy" class="text-stalker-neon font-bold text-base">0 E</div>
+            </div>
+        </div>
+
+        <!-- Controls & Fullscreen -->
+        <div class="flex items-center gap-2">
+            <button onclick="toggleSettingsModal()" class="bg-black/60 hover:bg-stalker-border text-stalker-neon border border-stalker-border px-3 py-1.5 rounded transition">
+                ⚙️ Налаштування
+            </button>
+            <button onclick="toggleFullscreen()" class="bg-black/60 hover:bg-stalker-border text-stalker-neon border border-stalker-border px-3 py-1.5 rounded transition">
+                ⛶ Повний екран
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN GAME LAYOUT -->
+    <div class="relative z-20 flex-1 flex flex-col md:flex-row overflow-hidden p-3 gap-3">
+
+        <!-- LEFT SIDEBAR: Leaderboard & Feed -->
+        <div class="w-full md:w-80 flex flex-col gap-3 shrink-0">
+            <!-- Top Donors Leaderboard -->
+            <div class="glass-panel p-3 rounded-lg flex flex-col gap-2">
+                <div class="text-xs uppercase font-bold text-stalker-accent border-b border-stalker-border pb-1 flex items-center justify-between">
+                    <span>🏆 Топ-Глядачі Стріму</span>
+                    <span class="text-[10px] text-gray-400">Live</span>
+                </div>
+                <div id="leaderboard-list" class="flex flex-col gap-1.5 max-h-36 overflow-y-auto pr-1 text-xs">
+                    <!-- Populated dynamically -->
+                    <div class="flex items-center justify-between bg-black/40 p-1.5 rounded border border-stalker-border/50">
+                        <div class="flex items-center gap-2">
+                            <img src="https://i.postimg.cc/R0SfkFcd/images-(20).jpg" class="w-6 h-6 rounded-full object-cover border border-amber-500" alt="Top 1">
+                            <span class="text-amber-400 font-bold truncate max-w-[100px]">StalkerKing</span>
+                        </div>
+                        <span class="text-stalker-neon font-mono">500 E</span>
+                    </div>
+                    <div class="flex items-center justify-between bg-black/40 p-1.5 rounded border border-stalker-border/50">
+                        <div class="flex items-center gap-2">
+                            <img src="https://i.postimg.cc/SKS8BsWD/images-(21).jpg" class="w-6 h-6 rounded-full object-cover border border-slate-400" alt="Top 2">
+                            <span class="text-slate-300 truncate max-w-[100px]">AnomalousGirl</span>
+                        </div>
+                        <span class="text-stalker-neon font-mono">250 E</span>
+                    </div>
+                    <div class="flex items-center justify-between bg-black/40 p-1.5 rounded border border-stalker-border/50">
+                        <div class="flex items-center gap-2">
+                            <img src="https://i.postimg.cc/htbTZx7j/images-(3).jpg" class="w-6 h-6 rounded-full object-cover border border-amber-700" alt="Top 3">
+                            <span class="text-amber-600 truncate max-w-[100px]">MonolithFan</span>
+                        </div>
+                        <span class="text-stalker-neon font-mono">120 E</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Stream Feed Ticker -->
+            <div class="glass-panel p-3 rounded-lg flex flex-col flex-1 min-h-[150px]">
+                <div class="text-xs uppercase font-bold text-stalker-neon border-b border-stalker-border pb-1 mb-2 flex items-center justify-between">
+                    <span>📡 Потоки Активності</span>
+                    <span class="w-2 h-2 rounded-full bg-stalker-neon animate-pulse"></span>
+                </div>
+                <div id="activity-feed" class="flex flex-col gap-1.5 overflow-y-auto flex-1 text-xs pr-1">
+                    <div class="bg-black/50 p-2 rounded border border-stalker-border/30 text-gray-300">
+                        <span class="text-stalker-accent font-bold">@system</span>: Лабораторія SCRP активована в Зоні.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER: GAME CANVAS CONTAINER -->
+        <div class="flex-1 glass-panel rounded-lg relative overflow-hidden flex flex-col items-center justify-center p-1">
+            <canvas id="gameCanvas" class="w-full h-full rounded shadow-inner bg-black/80 cursor-crosshair object-contain"></canvas>
+            
+            <!-- Game Over / Victory Overlay -->
+            <div id="game-over-overlay" class="absolute inset-0 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center gap-4 hidden z-30">
+                <div class="text-3xl md:text-5xl font-extrabold text-red-500 font-pixel tracking-wider neon-text animate-pulse">БАЗУ ЗНИЩЕНО ВИКИДОМ</div>
+                <p id="game-over-stats" class="text-gray-300 text-sm md:text-base text-center max-w-md">Зона забрала ще один аванпост SCRP Lab. Хвиля: 0 | Зароблено Енергії: 0</p>
+                <button onclick="restartGame()" class="bg-stalker-neon hover:bg-emerald-500 text-black font-bold px-6 py-2 rounded-lg neon-border transition transform hover:scale-105">
+                    Перезапустити Станцію
+                </button>
+            </div>
+
+            <!-- In-Canvas Floating Base Status -->
+            <div class="absolute top-4 left-4 glass-panel px-4 py-2 rounded flex flex-col gap-1 pointer-events-none">
+                <div class="flex justify-between items-center gap-4 text-xs">
+                    <span class="text-gray-300 font-bold">Щит SCRP Base:</span>
+                    <span id="base-hp-text" class="text-stalker-neon font-bold">100 / 100</span>
+                </div>
+                <div class="w-32 bg-black/60 h-2 rounded-full overflow-hidden border border-stalker-border">
+                    <div id="base-hp-bar" class="bg-stalker-neon h-full transition-all duration-300" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT SIDEBAR: Legend & Simulator -->
+        <div class="w-full md:w-80 flex flex-col gap-3 shrink-0">
+            <!-- Game Legend Overlay -->
+            <div class="glass-panel p-3 rounded-lg flex flex-col gap-2">
+                <div class="text-xs uppercase font-bold text-stalker-accent border-b border-stalker-border pb-1">
+                    📖 Інструкція для Глядачів
+                </div>
+                <div class="flex flex-col gap-2 text-xs">
+                    <div class="flex items-center gap-2.5 bg-black/40 p-1.5 rounded border border-stalker-border/40">
+                        <img src="https://i.postimg.cc/dVmrNdTw/images-(2).jpg" class="w-7 h-7 rounded object-cover border border-stalker-border shrink-0" alt="Rose">
+                        <div>
+                            <span class="text-pink-400 font-bold">🌹 Троянда (1):</span>
+                            <span class="text-gray-300 block text-[11px]">+10 набоїв / Спавн собаки</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2.5 bg-black/40 p-1.5 rounded border border-stalker-border/40">
+                        <img src="https://i.postimg.cc/3w8psRmW/images-(10).jpg" class="w-7 h-7 rounded object-cover border border-stalker-border shrink-0" alt="Donut">
+                        <div>
+                            <span class="text-amber-400 font-bold">🍩 Донат / Серце (5):</span>
+                            <span class="text-gray-300 block text-[11px]">Повна аптечка Сталкера</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2.5 bg-black/40 p-1.5 rounded border border-stalker-border/40">
+                        <img src="https://i.postimg.cc/9fmT6MGB/images-(19).jpg" class="w-7 h-7 rounded object-cover border border-stalker-border shrink-0" alt="Pizza">
+                        <div>
+                            <span class="text-red-400 font-bold">🍕 Піца / Журавлик (99):</span>
+                            <span class="text-gray-300 block text-[11px]">Викид Зони (Очищення)</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2.5 bg-black/40 p-1.5 rounded border border-stalker-border/40">
+                        <img src="https://i.postimg.cc/1zm6ktpp/images-(17).jpg" class="w-7 h-7 rounded object-cover border border-stalker-border shrink-0" alt="Rocket">
+                        <div>
+                            <span class="text-cyan-400 font-bold">🚀 Ракета / Лев (500+):</span>
+                            <span class="text-gray-300 block text-[11px]">Бойовий Дрон + Щит 30с</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2.5 bg-black/40 p-1.5 rounded border border-stalker-border/40">
+                        <span class="w-7 h-7 flex items-center justify-center bg-stalker-neon/20 text-stalker-neon font-bold rounded border border-stalker-neon/40 shrink-0">👍</span>
+                        <div>
+                            <span class="text-stalker-neon font-bold">Лайки (Кожні 100):</span>
+                            <span class="text-gray-300 block text-[11px]">+5 HP Бази та Заряд</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2.5 bg-black/40 p-1.5 rounded border border-stalker-border/40">
+                        <span class="w-7 h-7 flex items-center justify-center bg-purple-500/20 text-purple-400 font-bold rounded border border-purple-500/40 shrink-0">💬</span>
+                        <div>
+                            <span class="text-purple-400 font-bold">Коментарі:</span>
+                            <span class="text-gray-300 block text-[11px]">Спавн сталкера-бота (10с)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fallback Simulator Panel -->
+            <div class="glass-panel p-3 rounded-lg flex flex-col gap-2 flex-1">
+                <div class="text-xs uppercase font-bold text-stalker-neon border-b border-stalker-border pb-1 flex items-center justify-between">
+                    <span>🎮 Панель Симуляції (Test)</span>
+                    <span class="text-[10px] text-gray-400">Offline</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <button onclick="simulateAction('rose')" class="bg-black/60 hover:bg-pink-950/50 text-pink-400 border border-pink-500/30 p-2 rounded transition font-bold flex items-center justify-center gap-1">
+                        🌹 Троянда
+                    </button>
+                    <button onclick="simulateAction('donut')" class="bg-black/60 hover:bg-amber-950/50 text-amber-400 border border-amber-500/30 p-2 rounded transition font-bold flex items-center justify-center gap-1">
+                        🍩 Донат
+                    </button>
+                    <button onclick="simulateAction('pizza')" class="bg-black/60 hover:bg-red-950/50 text-red-400 border border-red-500/30 p-2 rounded transition font-bold flex items-center justify-center gap-1">
+                        🍕 Викид
+                    </button>
+                    <button onclick="simulateAction('rocket')" class="bg-black/60 hover:bg-cyan-950/50 text-cyan-400 border border-cyan-500/30 p-2 rounded transition font-bold flex items-center justify-center gap-1">
+                        🚀 Дрон
+                    </button>
+                    <button onclick="simulateAction('like')" class="bg-black/60 hover:bg-emerald-950/50 text-emerald-400 border border-emerald-500/30 p-2 rounded transition font-bold flex items-center justify-center gap-1">
+                        👍 +100 Лайків
+                    </button>
+                    <button onclick="simulateAction('comment')" class="bg-black/60 hover:bg-purple-950/50 text-purple-400 border border-purple-500/30 p-2 rounded transition font-bold flex items-center justify-center gap-1">
+                        💬 Коментар
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="glass-panel p-6 rounded-xl w-96 flex flex-col gap-4 border border-stalker-neon/40 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-stalker-border pb-2">
+                <h3 class="text-stalker-neon font-bold text-lg">Налаштування TikTok Live</h3>
+                <button onclick="toggleSettingsModal()" class="text-gray-400 hover:text-white font-bold text-lg">&times;</button>
+            </div>
+            <div class="flex flex-col gap-2">
+                <label class="text-xs text-gray-300 uppercase">TikTok Username:</label>
+                <input type="text" id="input-username" value="scrp_lab" class="bg-black/60 border border-stalker-border rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-stalker-neon">
+            </div>
+            <div class="flex flex-col gap-2">
+                <label class="text-xs text-gray-300 uppercase">Статус підключення:</label>
+                <div id="connection-status" class="flex items-center gap-2 text-xs bg-black/40 p-2 rounded border border-stalker-border">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    <span class="text-amber-400">Симуляція активна (Offline Mode)</span>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-2">
+                <button onclick="saveSettings()" class="bg-stalker-neon hover:bg-emerald-500 text-black font-bold px-4 py-2 rounded text-sm transition">
+                    Зберегти та Підключити
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN GAME LOGIC & ENGINE -->
+    <script>
+        // Assets Mapping (Preloaded Images)
+        const assets = {
+            bg: 'https://i.postimg.cc/FKTcN4Zc/images.jpg',
+            stalker: 'https://i.postimg.cc/3xCmfpDQ/images-(1).jpg',
+            medkit: 'https://i.postimg.cc/3w8psRmW/images-(10).jpg',
+            artifact: 'https://i.postimg.cc/d0sdb18Z/images-(11).jpg',
+            anomaly: 'https://i.postimg.cc/YSrg591m/images-(12).jpg',
+            mutantDog: 'https://i.postimg.cc/cJxYpHQn/images-(13).jpg',
+            mutantKrovosos: 'https://i.postimg.cc/5t4vh0wz/images-(14).jpg',
+            weaponRifle: 'https://i.postimg.cc/fbzXGLxX/images-(15).jpg',
+            weaponGauss: 'https://i.postimg.cc/43ftDdzV/images-(16).jpg',
+            drone: 'https://i.postimg.cc/1zm6ktpp/images-(17).jpg',
+            shield: 'https://i.postimg.cc/yN19MdFh/images-(18).jpg',
+            emission: 'https://i.postimg.cc/9fmT6MGB/images-(19).jpg',
+            roseIcon: 'https://i.postimg.cc/dVmrNdTw/images-(2).jpg',
+            top1: 'https://i.postimg.cc/R0SfkFcd/images-(20).jpg',
+            top2: 'https://i.postimg.cc/SKS8BsWD/images-(21).jpg',
+            top3: 'https://i.postimg.cc/htbTZx7j/images-(3).jpg',
+            droneCard: 'https://i.postimg.cc/qvXyDnCv/images-(5).jpg',
+            superAttack: 'https://i.postimg.cc/MG6RCTy6/images-(8).jpg'
+        };
+
+        // Preload Images into Memory
+        const loadedImages = {};
+        for (let key in assets) {
+            const img = new Image();
+            img.src = assets[key];
+            loadedImages[key] = img;
+        }
+
+        // Game State Variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameRunning = true;
+        let scoreEnergy = 0;
+        let wave = 1;
+        let baseHp = 100;
+        let maxBaseHp = 100;
+        let likesCount = 0;
+        let shieldActive = false;
+        let shieldTimer = 0;
+        let droneActive = false;
+        let droneTimer = 0;
+        let emissionActive = false;
+        let emissionTimer = 0;
+
+        let stalkerAmmo = 50;
+        let friendlyBots = [];
+        let enemies = [];
+        let particles = [];
+        let bullets = [];
+        let lootItems = [];
+
+        let topDonors = [
+            { name: 'StalkerKing', amount: 500, avatar: assets.top1 },
+            { name: 'AnomalousGirl', amount: 250, avatar: assets.top2 },
+            { name: 'MonolithFan', amount: 120, avatar: assets.top3 }
+        ];
+
+        // Resize Canvas to fit container
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // UI & Settings Functions
+        function toggleSettingsModal() {
+            const modal = document.getElementById('settings-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        function saveSettings() {
+            const username = document.getElementById('input-username').value.trim();
+            if (username) {
+                document.getElementById('display-username').innerText = '@' + username;
+            }
+            toggleSettingsModal();
+            addActivity('System', `Підключено до стріму @${username || 'scrp_lab'}`);
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error("Error attempting to enable fullscreen:", err);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        function addActivity(user, action) {
+            const feed = document.getElementById('activity-feed');
+            const item = document.createElement('div');
+            item.className = 'bg-black/50 p-2 rounded border border-stalker-border/30 text-gray-300 animate-fadeIn';
+            item.innerHTML = `<span class="text-stalker-accent font-bold">@${user}</span>: ${action}`;
+            feed.insertBefore(item, feed.firstChild);
+            if (feed.children.length > 25) {
+                feed.removeChild(feed.lastChild);
+            }
+        }
+
+        function updateLeaderboard(name, amount) {
+            let found = topDonors.find(d => d.name === name);
+            if (found) {
+                found.amount += amount;
+            } else {
+                topDonors.push({ name, amount, avatar: assets.top3 });
+            }
+            topDonors.sort((a, b) => b.amount - a.amount);
+            topDonors = topDonors.slice(0, 3);
+
+            const container = document.getElementById('leaderboard-list');
+            container.innerHTML = '';
+            topDonors.forEach((donor, idx) => {
+                const borderColors = ['border-amber-500', 'border-slate-400', 'border-amber-700'];
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between bg-black/40 p-1.5 rounded border border-stalker-border/50';
+                div.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <img src="${donor.avatar}" class="w-6 h-6 rounded-full object-cover border ${borderColors[idx]}" alt="Top ${idx+1}">
+                        <span class="text-gray-200 font-bold truncate max-w-[100px]">${donor.name}</span>
+                    </div>
+                    <span class="text-stalker-neon font-mono">${donor.amount} E</span>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // Simulation Triggers for Fallback Testing
+        function simulateAction(type) {
+            const randomNames = ['VovaStalker', 'Krot_99', 'SidorovichFan', 'DutySoldier', 'FreedomRider', 'SciLabGeek'];
+            const name = randomNames[Math.floor(Math.random() * randomNames.length)];
+
+            if (type === 'rose') {
+                stalkerAmmo += 10;
+                scoreEnergy += 1;
+                spawnMutant('dog');
+                addActivity(name, 'надіслав 🌹 Троянду! (+10 набоїв, спавн собачки)');
+                updateLeaderboard(name, 1);
+            } else if (type === 'donut') {
+                baseHp = Math.min(maxBaseHp, baseHp + 35);
+                scoreEnergy += 5;
+                addActivity(name, 'надіслав 🍩 Донат! (Аптечка повне відновлення)');
+                updateLeaderboard(name, 5);
+            } else if (type === 'pizza') {
+                triggerEmission();
+                scoreEnergy += 99;
+                addActivity(name, 'надіслав 🍕 Піцу! (Апокаліптичний Викид Зони)');
+                updateLeaderboard(name, 99);
+            } else if (type === 'rocket') {
+                droneActive = true;
+                droneTimer = 1800; // 30 seconds at 60fps
+                shieldActive = true;
+                shieldTimer = 1800;
+                scoreEnergy += 500;
+                addActivity(name, 'надіслав 🚀 Ракету! (Бойовий Дрон + Щит 30с)');
+                updateLeaderboard(name, 500);
+            } else if (type === 'like') {
+                likesCount += 100;
+                baseHp = Math.min(maxBaseHp, baseHp + 15);
+                addActivity('Stream', `Сплеск лайків! (${likesCount}) Заряд аномалії +15 HP`);
+            } else if (type === 'comment') {
+                spawnBot(name);
+                addActivity(name, 'написав коментар у чаті (Спавн сталкера-бота)');
+            }
+            updateHUD();
+        }
+
+        // Entity Spawning Logic
+        function spawnMutant(type = 'random') {
+            const x = canvas.width + 50;
+            const y = canvas.height - 120 - Math.random() * 50;
+            const isKrovosos = type === 'krovosos' || (type === 'random' && Math.random() > 0.6);
+            
+            enemies.push({
+                x,
+                y,
+                width: isKrovosos ? 65 : 50,
+                height: isKrovosos ? 65 : 50,
+                speed: isKrovosos ? 1.8 : 2.5,
+                hp: isKrovosos ? 40 : 20,
+                maxHp: isKrovosos ? 40 : 20,
+                type: isKrovosos ? 'krovosos' : 'dog',
+                image: isKrovosos ? loadedImages.mutantKrovosos : loadedImages.mutantDog
+            });
+        }
+
+        function spawnBot(name) {
+            friendlyBots.push({
+                name,
+                x: 100 + Math.random() * 150,
+                y: canvas.height - 130,
+                timer: 600 // 10 seconds at 60fps
+            });
+        }
+
+        function triggerEmission() {
+            emissionActive = true;
+            emissionTimer = 120; // 2 seconds flash
+            // Destroy all enemies
+            enemies.forEach(e => {
+                scoreEnergy += 10;
+                for (let i = 0; i < 8; i++) {
+                    particles.push({
+                        x: e.x,
+                        y: e.y,
+                        vx: (Math.random() - 0.5) * 8,
+                        vy: (Math.random() - 0.5) * 8,
+                        color: '#00ff66',
+                        life: 30
+                    });
+                }
+            });
+            enemies = [];
+        }
+
+        function updateHUD() {
+            document.getElementById('hud-wave').innerText = String(wave).padStart(2, '0');
+            document.getElementById('hud-energy').innerText = scoreEnergy + ' E';
+            document.getElementById('base-hp-text').innerText = `${Math.max(0, Math.floor(baseHp))} / ${maxBaseHp}`;
+            document.getElementById('base-hp-bar').style.width = `${Math.max(0, (baseHp / maxBaseHp) * 100)}%`;
+        }
+
+        // Game Engine Loop
+        let lastSpawnTime = 0;
+
+        function initGame() {
+            gameRunning = true;
+            scoreEnergy = 0;
+            wave = 1;
+            baseHp = 100;
+            likesCount = 0;
+            enemies = [];
+            friendlyBots = [];
+            particles = [];
+            bullets = [];
+            document.getElementById('game-over-overlay').classList.add('hidden');
+            updateHUD();
+        }
+
+        function restartGame() {
+            initGame();
+        }
+
+        function updateGame(timestamp) {
+            if (!gameRunning) return;
+
+            // Spawning waves of enemies
+            if (timestamp - lastSpawnTime > Math.max(1200, 3500 - wave * 200)) {
+                spawnMutant();
+                lastSpawnTime = timestamp;
+                if (Math.random() > 0.7) {
+                    wave++;
+                    updateHUD();
+                }
+            }
+
+            // Timers update
+            if (shieldActive) {
+                shieldTimer--;
+                if (shieldTimer <= 0) shieldActive = false;
+            }
+            if (droneActive) {
+                droneTimer--;
+                if (droneTimer <= 0) droneActive = false;
+                // Drone shoots enemy automatically
+                if (droneTimer % 30 === 0 && enemies.length > 0) {
+                    const target = enemies[0];
+                    bullets.push({
+                        x: canvas.width / 2,
+                        y: 100,
+                        vx: 12,
+                        vy: 0,
+                        damage: 25,
+                        isDrone: true
+                    });
+                }
+            }
+            if (emissionActive) {
+                emissionTimer--;
+                if (emissionTimer <= 0) emissionActive = false;
+            }
+
+            // Update friendly bots
+            friendlyBots.forEach((bot, idx) => {
+                bot.timer--;
+                if (bot.timer % 40 === 0 && enemies.length > 0) {
+                    // Bot shoots
+                    bullets.push({
+                        x: bot.x + 30,
+                        y: bot.y + 20,
+                        vx: 10,
+                        vy: 0,
+                        damage: 15
+                    });
+                }
+                if (bot.timer <= 0) {
+                    friendlyBots.splice(idx, 1);
+                }
+            });
+
+            // Update Bullets
+            bullets.forEach((b, idx) => {
+                b.x += b.vx;
+                // Check collision with enemies
+                enemies.forEach((e, eIdx) => {
+                    if (b.x > e.x && b.x < e.x + e.width && b.y > e.y && b.y < e.y + e.height) {
+                        e.hp -= b.damage;
+                        bullets.splice(idx, 1);
+                        if (e.hp <= 0) {
+                            scoreEnergy += e.type === 'krovosos' ? 15 : 5;
+                            enemies.splice(eIdx, 1);
+                        }
+                    }
+                });
+            });
+
+            // Update Enemies
+            enemies.forEach((e, idx) => {
+                e.x -= e.speed;
+                // Check base damage
+                if (e.x <= 150) {
+                    if (!shieldActive) {
+                        baseHp -= e.type === 'krovosos' ? 15 : 8;
+                    }
+                    enemies.splice(idx, 1);
+                    if (baseHp <= 0) {
+                        gameOver();
+                    }
+                }
+            });
+
+            // Main Stalker auto-fire towards closest enemy
+            if (Math.random() < 0.25 && enemies.length > 0 && stalkerAmmo > 0) {
+                stalkerAmmo--;
+                bullets.push({
+                    x: 180,
+                    y: canvas.height - 140,
+                    vx: 12,
+                    vy: 0,
+                    damage: 12
+                });
+            }
+
+            updateHUD();
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Background Zone
+            if (loadedImages.bg.complete) {
+                ctx.drawImage(loadedImages.bg, 0, 0, canvas.width, canvas.height);
+            }
+            ctx.fillStyle = 'rgba(10, 13, 12, 0.65)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const groundY = canvas.height - 120;
+
+            // Draw Base / SCRP Lab Wall on the left
+            ctx.fillStyle = '#1e3328';
+            ctx.fillRect(0, groundY - 80, 160, 180);
+            ctx.strokeStyle = '#00ff66';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, groundY - 80, 160, 180);
+
+            // Draw Shield if active
+            if (shieldActive) {
+                ctx.strokeStyle = '#00ffff';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(160, groundY, 90, Math.PI * 1.5, Math.PI * 0.5, true);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
+                ctx.fill();
+            }
+
+            // Draw Main Stalker Character
+            if (loadedImages.stalker.complete) {
+                ctx.drawImage(loadedImages.stalker, 60, groundY - 60, 70, 70);
+            }
+
+            // Draw Friendly Bots
+            friendlyBots.forEach(bot => {
+                if (loadedImages.stalker.complete) {
+                    ctx.drawImage(loadedImages.stalker, bot.x, groundY - 50, 50, 50);
+                }
+                ctx.fillStyle = '#00ff66';
+                ctx.font = '10px Share Tech Mono';
+                ctx.fillText(`@${bot.name}`, bot.x, groundY - 55);
+            });
+
+            // Draw Drone if active
+            if (droneActive && loadedImages.drone.complete) {
+                ctx.drawImage(loadedImages.drone, canvas.width / 2 - 30, 70, 60, 60);
+                ctx.strokeStyle = '#00ffff';
+                ctx.strokeRect(canvas.width / 2 - 30, 70, 60, 60);
+            }
+
+            // Draw Enemies
+            enemies.forEach(e => {
+                if (e.image.complete) {
+                    ctx.drawImage(e.image, e.x, groundY - e.height + 10, e.width, e.height);
+                }
+                // HP Bar for Enemy
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(e.x, groundY - e.height - 5, e.width, 5);
+                ctx.fillStyle = '#ef4444';
+                ctx.fillRect(e.x, groundY - e.height - 5, e.width * (e.hp / e.maxHp), 5);
+            });
+
+            // Draw Bullets
+            bullets.forEach(b => {
+                ctx.fillStyle = b.isDrone ? '#00ffff' : '#ffb703';
+                ctx.fillRect(b.x, b.y, b.isDrone ? 8 : 6, b.isDrone ? 4 : 3);
+            });
+
+            // Draw Emission Flash Effect
+            if (emissionActive) {
+                ctx.fillStyle = 'rgba(0, 255, 102, 0.4)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                if (loadedImages.emission.complete) {
+                    ctx.drawImage(loadedImages.emission, canvas.width / 2 - 150, canvas.height / 2 - 150, 300, 300);
+                }
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('game-over-stats').innerText = `Зона забрала аванпост SCRP Lab. Хвиля: ${wave} | Зароблено Енергії: ${scoreEnergy} E`;
+            document.getElementById('game-over-overlay').classList.remove('hidden');
+        }
+
+        // Main Loop Wrapper
+        function mainLoop(timestamp) {
+            updateGame(timestamp);
+            drawGame();
+            requestAnimationFrame(mainLoop);
+        }
+
+        // Start Engine
+        initGame();
+        requestAnimationFrame(mainLoop);
+    </script>
+</body>
+</html>
